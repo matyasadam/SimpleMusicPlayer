@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">SimpleMusicPlayer</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="play">Play/Pause</string>
+    <string name="next">Next</string>
+    <string name="prev">Prev</string>
+    <string name="elpassed">Elpased:</string>
+    <string name="title">Title:</string>
+    <string name="title_activity_playlist">PlaylistActivity</string>
+    <string name="playlist">Playlist</string>
+    <string name="total">Total</string>
+    <string name="image">image</string>
+    <string name="playImage">playImageButton</string>
+    <string name="playlistbutton">playlistbutton</string>
+    <string name="prevbutton">prevbutton</string>
+    <string name="nextbutton">nextbutton</string>
+    <string name="s">S</string>
+    <string name="r">R</string>
+</resources>
