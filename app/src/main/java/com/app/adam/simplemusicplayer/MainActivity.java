@@ -16,6 +16,7 @@ import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -49,6 +50,7 @@ public class MainActivity extends Activity implements MediaPlayer.OnCompletionLi
     private Handler mHandler = new Handler();
     private Converter converter;
     private ArrayList<HashMap<String, String>> songsList = new ArrayList<>();
+    private ArrayList<HashMap<String, String>> songsListWithBPM = new ArrayList<>();
     private MediaMetadataRetriever metaRetriver ;
     private Boolean shuffle = false;
     private Boolean repeat = false;
@@ -94,7 +96,7 @@ public class MainActivity extends Activity implements MediaPlayer.OnCompletionLi
         songFinder = new SongFinder();
 
         songsList=songFinder.getTracks(getContentResolver(),1);
-
+        new makeBPM_PlaylistInBack().execute("");
         converter=new Converter();
 
         playSong(0);
@@ -371,5 +373,18 @@ public class MainActivity extends Activity implements MediaPlayer.OnCompletionLi
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
+    }
+    private class makeBPM_PlaylistInBack extends AsyncTask<String,Integer,ArrayList<HashMap<String,String>>> {
+
+
+        @Override
+        protected ArrayList<HashMap<String, String>> doInBackground(String... params) {
+            return songFinder.getTracks(getContentResolver(),0);
+        }
+        @Override
+        protected void onPostExecute(ArrayList<HashMap<String,String>> result) {
+            songsListWithBPM=result;
+            Toast.makeText(getBaseContext(),"BPM List Loaded",Toast.LENGTH_SHORT).show();
+        }
     }
 }

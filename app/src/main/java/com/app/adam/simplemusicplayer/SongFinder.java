@@ -2,24 +2,46 @@ package com.app.adam.simplemusicplayer;
 
 import android.content.ContentResolver;
 import android.database.Cursor;
+import android.graphics.Path;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
 
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.audio.exceptions.CannotReadException;
+import org.jaudiotagger.audio.exceptions.InvalidAudioFrameException;
+import org.jaudiotagger.audio.exceptions.ReadOnlyFileException;
+import org.jaudiotagger.audio.mp3.MP3AudioHeader;
+import org.jaudiotagger.audio.mp3.MP3File;
+import org.jaudiotagger.tag.Tag;
+import org.jaudiotagger.tag.TagException;
+import org.jaudiotagger.tag.id3.AbstractID3v2Tag;
+import org.jaudiotagger.tag.id3.ID3v24Frames;
+
 import java.io.File;
 import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Created by Adam on 3/13/2015.
  */
 public class SongFinder {
     private ArrayList<HashMap<String, String>> songsList = new ArrayList<>();
-    public SongFinder(){};
+    public SongFinder(){
+        //Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
+    };
 
-
+    /**
+     * Returns the full media library with track id,artist,title,data(song path),album
+     * @param crIn
+     * @param type
+     * @return
+     */
     public ArrayList<HashMap<String, String>> getTracks(ContentResolver crIn,int type){
         ContentResolver cr = crIn;
 
@@ -35,7 +57,28 @@ public class SongFinder {
         };
         Cursor cur = cr.query(uri, projection, selection, null, sortOrder);
         int count = 0;
+        if(cur != null && type==0)
+        {
+            count = cur.getCount();
 
+            if(count > 0)
+            {
+                while(cur.moveToNext())
+                {
+                    String id=cur.getString(0);
+                    String artist=cur.getString(1);
+                    String title=cur.getString(2);
+                    String data=cur.getString(3);
+                    HashMap<String,String> tmp=new HashMap<>();
+                    tmp.put("songId",id);
+                    tmp.put("songArtist",artist);
+                    tmp.put("songTitle",title);
+                    tmp.put("songPath",data);
+                    tmp.put("songBPM",getBPMtagForSong(data));
+                    songsList.add(tmp);
+                }
+            }
+        }
         if(cur != null && type==1)
         {
             count = cur.getCount();
@@ -225,5 +268,35 @@ public class SongFinder {
         }
         return tmp;
     }
+    private String getBPMtagForSong(String path){
+      String tmp="";
+        MP3File f      = null;
+
+        try {
+            File file=new File(path);
+            f = (MP3File) AudioFileIO.read(file);
+            Tag tag        = f.getTag();
+            AbstractID3v2Tag v2tag  = f.getID3v2Tag();
+            tmp=v2tag.getFirst(ID3v24Frames.FRAME_ID_BPM);
+
+        } catch (CannotReadException e) {
+
+        } catch (IOException e) {
+
+        } catch (TagException e) {
+
+        } catch (ReadOnlyFileException e) {
+
+        } catch (InvalidAudioFrameException e) {
+
+        }
+      return tmp;
+    }
+    public void printSongList(){
+        for(int i=0;i<songsList.size();i++){
+            Log.i("Songlist",songsList.get(i).get("songTitle")+" "+songsList.get(i).get("songBPM"));
+        }
+    }
+
 
 }
