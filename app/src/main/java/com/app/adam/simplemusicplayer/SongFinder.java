@@ -33,7 +33,7 @@ import java.util.logging.Logger;
 public class SongFinder {
     private ArrayList<HashMap<String, String>> songsList = new ArrayList<>();
     public SongFinder(){
-        //Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
+        Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     };
 
     /**

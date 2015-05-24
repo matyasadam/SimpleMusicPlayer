@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">SimpleMusicPlayer</string>
-
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="play">Play/Pause</string>
@@ -18,4 +17,16 @@
     <string name="nextbutton">nextbutton</string>
     <string name="s">S</string>
     <string name="r">R</string>
+    <string name="Exit">Exit</string>
+    <string name="action_playlist">Playlist</string>
+    <string name="title_activity_settings">SettingsActivity</string>
+
+    <string name="title_activity_splash_screen">SplashScreenActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="img">img</string>
+    <string name="log_filename">%1$s%2$s%3$d%4$s</string>
+    <string name="no_resolution">Google Play services: unable to resolve connection error.</string>
+    <string name="unknown_activity_request_code">Received an unknown activity request code %1$d in onActivityResult.</string>
+    <string name="play_services_available">Location Services is available</string>
 </resources>
