@@ -29,4 +29,9 @@
     <string name="no_resolution">Google Play services: unable to resolve connection error.</string>
     <string name="unknown_activity_request_code">Received an unknown activity request code %1$d in onActivityResult.</string>
     <string name="play_services_available">Location Services is available</string>
+    <string name="mustache_player">Mustache Player</string>
+    <string name="context_on">Contextuality ON</string>
+    <string name="context_off">Contextuality OFF</string>
+    <string name="contextON_OFF">Turn contextuality on or off</string>
+    <string name="sb">Save Settings</string>
 </resources>

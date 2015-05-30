@@ -9,11 +9,12 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.Switch;
 
 
 public class SettingsActivity extends Activity {
 
-    private CheckBox contextuality;
+    private Switch contextuality;
     private Button saveButton;
 
 
@@ -27,7 +28,7 @@ public class SettingsActivity extends Activity {
 
 
 
-        contextuality = (CheckBox)findViewById(R.id.contextalityCB);
+        contextuality = (Switch)findViewById(R.id.switch1);
         saveButton = ((Button)findViewById(R.id.saveButton));
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override

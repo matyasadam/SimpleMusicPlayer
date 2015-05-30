@@ -36,15 +36,10 @@ public class SongFinder {
         Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     };
 
-    /**
-     * Returns the full media library with track id,artist,title,data(song path),album
-     * @param crIn
-     * @param type
-     * @return
-     */
-    public ArrayList<HashMap<String, String>> getTracks(ContentResolver crIn,int type){
-        ContentResolver cr = crIn;
 
+    public ArrayList<HashMap<String, String>> getTracksWithBMP(ContentResolver crIn) {
+        ArrayList<HashMap<String, String>> songsList2 = new ArrayList<>();
+        ContentResolver cr = crIn;
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
         String sortOrder = MediaStore.Audio.Media.TITLE + " ASC";
@@ -57,28 +52,49 @@ public class SongFinder {
         };
         Cursor cur = cr.query(uri, projection, selection, null, sortOrder);
         int count = 0;
-        if(cur != null && type==0)
-        {
-            count = cur.getCount();
+        if (cur != null) {
 
-            if(count > 0)
-            {
-                while(cur.moveToNext())
-                {
-                    String id=cur.getString(0);
-                    String artist=cur.getString(1);
-                    String title=cur.getString(2);
-                    String data=cur.getString(3);
-                    HashMap<String,String> tmp=new HashMap<>();
-                    tmp.put("songId",id);
-                    tmp.put("songArtist",artist);
-                    tmp.put("songTitle",title);
-                    tmp.put("songPath",data);
-                    tmp.put("songBPM",getBPMtagForSong(data));
-                    songsList.add(tmp);
+            count = cur.getCount();
+            if (count > 0) {
+                while (cur.moveToNext()) {
+                    String id = cur.getString(0);
+                    String artist = cur.getString(1);
+                    String title = cur.getString(2);
+                    String data = cur.getString(3);
+                    HashMap<String, String> tmp = new HashMap<>();
+                    tmp.put("songId", id);
+                    tmp.put("songArtist", artist);
+                    tmp.put("songTitle", title);
+                    tmp.put("songPath", data);
+                    MyTags tmpMyTag = getBPM_And_Genre_TagForSong(data);
+                    tmp.put("songBPM", tmpMyTag.getBmp());
+                    tmp.put("songGenre", tmpMyTag.getGenre());
+
+                    songsList2.add(tmp);
                 }
             }
+
         }
+        cur.close();
+//        Log.i("Muszti","Song list sizeeeeeee: "+songsList.size());
+        songsList=songsList2;
+        return songsList2;
+    }
+    public ArrayList<HashMap<String, String>> getTracks(ContentResolver crIn,int type){
+        ContentResolver cr = crIn;
+        Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
+        String sortOrder = MediaStore.Audio.Media.TITLE + " ASC";
+        String[] projection = {
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.DATA,
+                MediaStore.Audio.Media.ALBUM
+        };
+        Cursor cur = cr.query(uri, projection, selection, null, sortOrder);
+        int count = 0;
+
         if(cur != null && type==1)
         {
             count = cur.getCount();
@@ -144,6 +160,7 @@ public class SongFinder {
         }
 
         cur.close();
+
         return songsList;
     }
     public ArrayList<HashMap<String, String>> getTracksByArtist(ContentResolver crIn,String artistIn){
@@ -268,8 +285,8 @@ public class SongFinder {
         }
         return tmp;
     }
-    private String getBPMtagForSong(String path){
-      String tmp="";
+    private MyTags getBPM_And_Genre_TagForSong(String path){
+      MyTags tmp=new MyTags();
         MP3File f      = null;
 
         try {
@@ -277,7 +294,14 @@ public class SongFinder {
             f = (MP3File) AudioFileIO.read(file);
             Tag tag        = f.getTag();
             AbstractID3v2Tag v2tag  = f.getID3v2Tag();
-            tmp=v2tag.getFirst(ID3v24Frames.FRAME_ID_BPM);
+            String BPM=v2tag.getFirst(ID3v24Frames.FRAME_ID_BPM);
+            if(BPM!=null){
+                tmp.setBmp(BPM);
+            }
+            String Genre=v2tag.getFirst(ID3v24Frames.FRAME_ID_GENRE);
+            if(Genre!=null){
+                tmp.setGenre(Genre);
+            }
 
         } catch (CannotReadException e) {
 
@@ -292,6 +316,7 @@ public class SongFinder {
         }
       return tmp;
     }
+
     public void printSongList(){
         for(int i=0;i<songsList.size();i++){
             Log.i("Songlist",songsList.get(i).get("songTitle")+" "+songsList.get(i).get("songBPM"));

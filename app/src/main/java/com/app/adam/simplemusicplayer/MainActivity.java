@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -23,10 +24,12 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.ActionBarActivity;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -52,6 +55,8 @@ import java.util.TimerTask;
 
 public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCompletionListener, SeekBar.OnSeekBarChangeListener,SensorEventListener {
 
+    public static final String PREFS_NAME = "SP_MustachePlayer";
+
     private SensorManager sensorMan;
     private Sensor proxiSen;
     private ImageButton nextButton,prevButton,playButton,shuffleButton,repeatButton;
@@ -64,6 +69,9 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
     private Handler mHandler = new Handler();
     private Converter converter;
     private ArrayList<HashMap<String, String>> songsList = new ArrayList<>();
+    private ArrayList<HashMap<String, String>> songsListVechicle = new ArrayList<>();
+    private ArrayList<HashMap<String, String>> songsListFoot = new ArrayList<>();
+    private ArrayList<HashMap<String, String>> songsListStill = new ArrayList<>();
     private ArrayList<HashMap<String, String>> songsListWithBPM = new ArrayList<>();
     private MediaMetadataRetriever metaRetriver ;
     private Boolean shuffle = false;
@@ -73,56 +81,34 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
     private long lastUpdateProxiSen = 0;
     private Boolean proximytySenSwitch = false;
     private Boolean contextON_OFF = false;
-    private LocalBroadcastManager mBroadcastManager;
     private LogFile mLogFile;
     private ActivityUtils.REQUEST_TYPE mRequestType;
-    IntentFilter mBroadcastFilter;
     private DetectionRequester mDetectionRequester;
     private DetectionRemover mDetectionRemover;
-
+    private final Handler handler = new Handler();
+    private Timer timer = new Timer();
+    private Timer timer2 = new Timer();
+    private TimerTask doAsynchronousTask,scrollTask;
+    private Boolean dataLoaded=false;
+    private Boolean check=false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mBroadcastManager = LocalBroadcastManager.getInstance(this);
-
-        mBroadcastFilter = new IntentFilter(ActivityUtils.ACTION_REFRESH_STATUS_LIST);
-        mBroadcastFilter.addCategory(ActivityUtils.CATEGORY_LOCATION_SERVICES);
 
         mDetectionRequester = new DetectionRequester(this);
         mDetectionRemover = new DetectionRemover(this);
-
         mLogFile = LogFile.getInstance(this);
 
-        final Handler handler = new Handler();
-        Timer timer = new Timer();
-        TimerTask doAsynchronousTask = new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(new Runnable() {
-                    @SuppressWarnings("unchecked")
-                    public void run() {
-                        try {
-                            printActivityHistory();
-                        }
-                        catch (Exception e) {
-                            // TODO Auto-generated catch block
-                        }
-                    }
-                });
-            }
-        };
-        timer.schedule(doAsynchronousTask, 0, 2000);
+//        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+//        keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+//
+//        sensorMan = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+//        proxiSen = sensorMan.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+//        sensorMan.registerListener(this, proxiSen, SensorManager.SENSOR_DELAY_NORMAL);
 
-
-        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-
-        sensorMan = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        proxiSen = sensorMan.getDefaultSensor(Sensor.TYPE_PROXIMITY);
-        sensorMan.registerListener(this, proxiSen, SensorManager.SENSOR_DELAY_NORMAL);
         setTitle("");
 
         playButton = (ImageButton) findViewById(R.id.playButton);
@@ -131,11 +117,9 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
         shuffleButton = (ImageButton) findViewById(R.id.shuffleButton);
         repeatButton = (ImageButton) findViewById(R.id.repeatButton);
         titleTv = (TextView) findViewById(R.id.titleTV);
-        titleTv.setSelected(true);
         elpasedTV = (TextView) findViewById(R.id.elpassedTV);
         totalTV = (TextView) findViewById(R.id.totalTV);
         albumArt = (ImageView) findViewById(R.id.imageView);
-
 
         seekBar = (SeekBar) findViewById(R.id.seekBar);
         seekBar.setOnSeekBarChangeListener(this);
@@ -147,10 +131,15 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
         songFinder = new SongFinder();
 
         songsList = songFinder.getTracks(getContentResolver(), 1);
+
         new makeBPM_PlaylistInBack().execute("");
         converter = new Converter();
 
-        playSong(0);
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        currentSongIndex = settings.getInt("sp_songIndex", 0);
+
+        playSong(currentSongIndex);
+
 
         playButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -250,11 +239,27 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
             }
             else{
                 contextON_OFF = false;
+
             }
         }
 
+        doAsynchronousTask = new TimerTask() {
+            @Override
+            public void run() {
+                handler.post(new Runnable() {
+                    @SuppressWarnings("unchecked")
+                    public void run() {
+                        try {
+                            changePlaylistForActivity();
+                        }
+                        catch (Exception e) {
+                        }
+                    }
+                });
+            }
+        };
+        timer.schedule(doAsynchronousTask, 0, 5000);
     }
-
 
     @Override
     protected void onActivityResult(int requestCode,int resultCode, Intent data) {
@@ -267,78 +272,57 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
             Boolean datas = data.getExtras().getBoolean("contextOn");
             if (datas) {
                 contextON_OFF = true;
-                Toast.makeText(getBaseContext(),"Contextuality ON",Toast.LENGTH_SHORT).show();
+                Toast.makeText(getBaseContext(),getString(R.string.context_on),Toast.LENGTH_SHORT).show();
             }
             else{
                 contextON_OFF = false;
-                Toast.makeText(getBaseContext(),"Contextuality OFF",Toast.LENGTH_SHORT).show();
+                Toast.makeText(getBaseContext(),getString(R.string.context_off),Toast.LENGTH_SHORT).show();
             }
         }
         switch (requestCode) {
-
-            // If the request code matches the code sent in onConnectionFailed
             case ActivityUtils.CONNECTION_FAILURE_RESOLUTION_REQUEST :
-
                 switch (resultCode) {
-                    // If Google Play services resolved the problem
                     case Activity.RESULT_OK:
-
-                        // If the request was to start activity recognition updates
                         if (ActivityUtils.REQUEST_TYPE.ADD == mRequestType) {
-
-                            // Restart the process of requesting activity recognition updates
                             mDetectionRequester.requestUpdates();
-
-                            // If the request was to remove activity recognition updates
                         } else if (ActivityUtils.REQUEST_TYPE.REMOVE == mRequestType ){
-
-                                /*
-                                 * Restart the removal of all activity recognition updates for the
-                                 * PendingIntent.
-                                 */
-                            mDetectionRemover.removeUpdates(
-                                    mDetectionRequester.getRequestPendingIntent());
-
+                            mDetectionRemover.removeUpdates(mDetectionRequester.getRequestPendingIntent());
                         }
                         break;
-
-                    // If any other result was returned by Google Play services
                     default:
-
-                        // Report that Google Play services was unable to resolve the problem.
                         Log.d(ActivityUtils.APPTAG, getString(R.string.no_resolution));
                 }
-
-                // If any other request code was received
             default:
-                // Report that this Activity received an unknown requestCode
-                Log.d(ActivityUtils.APPTAG,
-                        getString(R.string.unknown_activity_request_code, requestCode));
-
+                Log.d(ActivityUtils.APPTAG,getString(R.string.unknown_activity_request_code, requestCode));
                 break;
         }
-
+        makeNotification(currentSongIndex,1);
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public void  playSong(int songIndex){
        if(!songsList.isEmpty()){
            try {
+               timer2.cancel();
                mp.reset();
                mp.setDataSource(songsList.get(songIndex).get("songPath"));
                mp.prepare();
                mp.start();
 
-               String songTitle = songsList.get(songIndex).get("songArtist")+": "+songsList.get(songIndex).get("songTitle");
+
+
+               String songTitle = songsList.get(songIndex).get("songArtist")+": "+songsList.get(songIndex).get("songTitle")+"     ";
+
+               if(dataLoaded && contextON_OFF){
+                   songTitle = songsList.get(songIndex).get("songArtist")+": "+songsList.get(songIndex).get("songTitle")+" "+songsList.get(songIndex).get("songBPM")+"     ";
+               }
+
                titleTv.setText(songTitle);
                makeNotification(songIndex,1);
                metaRetriver.setDataSource(songsList.get(songIndex).get("songPath"));
                try { byte [] art = metaRetriver.getEmbeddedPicture();
                    Bitmap songImage = BitmapFactory.decodeByteArray(art, 0, art.length);
                    albumArt.setImageBitmap(songImage);
-//                album.setText(metaRetriver .extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM));
-//                artist.setText(metaRetriver .extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST));
-//                genre.setText(metaRetriver .extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE));
                }
                catch (Exception e) {
                    albumArt.setImageDrawable(getDrawable(R.drawable.mustache_player3));
@@ -379,6 +363,7 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
             }
         }
     };
+
     @Override
     public void onCompletion(MediaPlayer arg0) {
 
@@ -402,79 +387,54 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
         }
     }
 
-
     @Override
     public void onDestroy(){
         makeNotification(0,2);
-        mDetectionRequester.getRequestPendingIntent().cancel();
+        stopUpdates();
         super.onDestroy();
         mp.stop();
         mp.release();
     }
-//
+
     @Override
     protected void onPause() {
-        mBroadcastManager.unregisterReceiver(updateListReceiver);
         super.onPause();
+
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putInt("sp_songIndex",currentSongIndex);
+
+        editor.commit();
 
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        mBroadcastManager.registerReceiver(updateListReceiver,mBroadcastFilter);
-        onStartUpdates(getCurrentFocus());
+        startUpdates();
         //sensorMan.registerListener(this, proxiSen, SensorManager.SENSOR_DELAY_NORMAL);
     }
-//    @Override
-//    public void onStop(){
-//        super.onStop();
-//        makeNotification(1,2);
-//
-//    }
-    BroadcastReceiver updateListReceiver = new BroadcastReceiver() {
-    @Override
-    public void onReceive(Context context, Intent intent) {
 
-            /*
-             * When an Intent is received from the update listener IntentService, update
-             * the displayed log.
-             */
-        //updateActivityHistory();
-        }
-    };
     private boolean servicesConnected() {
+        int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
 
-    // Check that Google Play services is available
-    int resultCode =
-            GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-
-    // If Google Play services is available
-    if (ConnectionResult.SUCCESS == resultCode) {
-
-        // In debug mode, log the status
-        Log.d(ActivityUtils.APPTAG, getString(R.string.play_services_available));
-
-        // Continue
-        return true;
-
-        // Google Play services was not available for some reason
-    } else {
-
-        // Display an error dialog
-        GooglePlayServicesUtil.getErrorDialog(resultCode, this, 0).show();
-        return false;
+        if (ConnectionResult.SUCCESS == resultCode) {
+            Log.d(ActivityUtils.APPTAG, getString(R.string.play_services_available));
+            return true;
+        } else {
+            GooglePlayServicesUtil.getErrorDialog(resultCode, this, 0).show();
+            return false;
+        }
     }
-}
-    public void onStartUpdates(View view) {
+
+    public void startUpdates() {
         if (!servicesConnected()) {
             return;
         }
         mRequestType = ActivityUtils.REQUEST_TYPE.ADD;
         mDetectionRequester.requestUpdates();
     }
-    public void onStopUpdates(View view) {
-
+    public void stopUpdates() {
         if (!servicesConnected()) {
 
             return;
@@ -484,28 +444,55 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
         mDetectionRequester.getRequestPendingIntent().cancel();
     }
     private void printActivityHistory() {
-
-//        inVechicle.setText("In Vechicle: "+mLogFile.getMyActivityData().getInVechiclePercent());
-//        onFoot.setText("On Foot: "+mLogFile.getMyActivityData().getOnFootPercent());
-//        onBycicle.setText("On Bycicle: "+mLogFile.getMyActivityData().getOnBicyclePercent());
-//        still.setText("Still: "+mLogFile.getMyActivityData().getStillPercent());
-//        unknown.setText("Unknown: "+mLogFile.getMyActivityData().getUnknownPercent());
-//        tilting.setText("Tilting: "+mLogFile.getMyActivityData().getTiltingPercent());
         Log.i("MustachePlayer",
                 "V: "+mLogFile.getMyActivityData().getInVechiclePercent()+
-                "F: "+mLogFile.getMyActivityData().getOnFootPercent()+
-                "B: "+mLogFile.getMyActivityData().getOnBicyclePercent()+
-                "S: "+mLogFile.getMyActivityData().getStillPercent()+
-                "U: "+mLogFile.getMyActivityData().getUnknownPercent()+
-                "T: "+mLogFile.getMyActivityData().getTiltingPercent()
+                " F: "+mLogFile.getMyActivityData().getOnFootPercent()+
+                " B: "+mLogFile.getMyActivityData().getOnBicyclePercent()+
+                " S: "+mLogFile.getMyActivityData().getStillPercent()+
+                " U: "+mLogFile.getMyActivityData().getUnknownPercent()+
+                "T : "+mLogFile.getMyActivityData().getTiltingPercent()
         );
 
     }
-
+    private void printRelevantActivity(){
+        MySortData data = mLogFile.getMyActivityData().getMostRelevant();
+        Log.i("MustachePlayer",data.getAct()+" "+data.getVal());
+    }
+    private void changePlaylistForActivity(){
+        MySortData data = mLogFile.getMyActivityData().getMostRelevant();
+        Log.i("MustachePlayer",data.getAct()+" "+data.getVal());
+        if(dataLoaded && contextON_OFF){
+            check=true;
+            if(data.getAct().equals("vechicle")){
+                Log.i("MustachePlayer","Vechicle playlist");
+                songsList=songsListVechicle;
+                currentSongIndex=new Random().nextInt(songsList.size());
+                shuffle=true;
+            }
+            if(data.getAct().equals("foot") || data.getAct().equals("bike")){
+                Log.i("MustachePlayer","Foot playlist");
+                songsList=songsListFoot;
+                currentSongIndex=new Random().nextInt(songsList.size());
+                shuffle=true;
+            }
+            if(data.getAct().equals("still")){
+                Log.i("MustachePlayer","Still playlist");
+                songsList=songsListStill;
+                currentSongIndex=new Random().nextInt(songsList.size());
+                shuffle=true;
+            }
+        }
+        if(dataLoaded && !contextON_OFF && check){
+                check=false;
+                songsList = songsListWithBPM;
+                Log.i("MustachePlayer","Standard playlist");
+                currentSongIndex=new Random().nextInt(songsList.size());
+                shuffle = false;
+        }
+    }
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
     }
-
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
         mHandler.removeCallbacks(mUpdateTimeTask);
@@ -548,22 +535,23 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
     }
+
     private class makeBPM_PlaylistInBack extends AsyncTask<String,Integer,ArrayList<HashMap<String,String>>> {
 
 
         @Override
         protected ArrayList<HashMap<String, String>> doInBackground(String... params) {
-            return songFinder.getTracks(getContentResolver(),0);
+            return songFinder.getTracksWithBMP(getContentResolver());
         }
         @Override
         protected void onPostExecute(ArrayList<HashMap<String,String>> result) {
             songsListWithBPM=result;
-            Toast.makeText(getBaseContext(),"BPM List Loaded",Toast.LENGTH_SHORT).show();
+            makeSpecialSongLists();
+            dataLoaded=true;
+            Toast.makeText(getBaseContext(),"BPM List Loaded ",Toast.LENGTH_SHORT).show();
         }
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -573,15 +561,26 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    public boolean onPrepareOptionsMenu (Menu menu) {
+        if (contextON_OFF){
+            menu.getItem(0).setEnabled(false);}
+        else{
+            menu.getItem(0).setEnabled(true);
+        }
+        if(!dataLoaded){
+            menu.getItem(1).setEnabled(false);}
+        else{
+            menu.getItem(1).setEnabled(true);
+        }
+        return true;
+    }
 
-        //noinspection SimplifiableIfStatement
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
         if (id == R.id.action_exit) {
             makeNotification(0,2);
+            stopUpdates();
             finish();
             System.exit(0);
         }
@@ -590,15 +589,13 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
             i.putExtra("contextOn",contextON_OFF);
             startActivityForResult(i, 200);
         }
-        if (id== R.id.action_playlist){
+        if (id== R.id.action_playlist && !contextON_OFF){
             Intent i = new Intent(getApplicationContext(), PlaylistActivity.class);
             i.putExtra("currentSongIndex",currentSongIndex);
             startActivityForResult(i, 100);
         }
         return super.onOptionsItemSelected(item);
     }
-
-
 
     public void makeNotification(int songIndex,int type){
         if(type==1){
@@ -611,17 +608,12 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
                     .setVisibility(Notification.VISIBILITY_PUBLIC)
                     .setAutoCancel(false);
 
-
-
             Intent resultIntent = new Intent(this, MainActivity.class);
             resultIntent.setAction(Intent.ACTION_MAIN);
             resultIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                    resultIntent, 0);
-
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,resultIntent, 0);
             nBuilder.setContentIntent(pendingIntent);
-
             notificationManager.notify(10, nBuilder.build());
         }
         if(type==2){
@@ -645,6 +637,33 @@ public class MainActivity extends ActionBarActivity implements MediaPlayer.OnCom
             notificationManager.notify(10, nBuilder.build());
         }
 
+    }
+
+    private void makeSpecialSongLists(){
+        for(int i=0;i<songsListWithBPM.size();i++){
+
+                //Log.i("Muszt",songsListWithBPM.get(i).get("songPath")+"*"+songsListWithBPM.get(i).get("songBPM"));
+
+            if(!songsListWithBPM.get(i).get("songBPM").equals("")){
+                if(Integer.valueOf(songsListWithBPM.get(i).get("songBPM"))<100){
+                    songsListStill.add(songsListWithBPM.get(i));
+                }
+                if(Integer.valueOf(songsListWithBPM.get(i).get("songBPM"))>100 && Integer.valueOf(songsListWithBPM.get(i).get("songBPM"))<135){
+                    songsListVechicle.add(songsListWithBPM.get(i));
+                }
+                if(Integer.valueOf(songsListWithBPM.get(i).get("songBPM"))>135){
+                    songsListFoot.add(songsListWithBPM.get(i));
+                }
+            }
+
+
+
+        }
+    }
+    private void printSpecSonglist(ArrayList<HashMap<String,String>> in){
+        for(int i=0;i<in.size();i++){
+            Log.i("Muszti",in.get(i).get("songTitle")+" "+in.get(i).get("songBPM"));
+        }
     }
 
 }

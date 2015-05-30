@@ -9,7 +9,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 
-public class SplashScreenActivity extends Activity {
+public class Mustache_Player extends Activity {
 
     private static int SPLASH_TIME_OUT = 3000;
 

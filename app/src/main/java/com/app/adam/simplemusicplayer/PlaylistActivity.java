@@ -1,7 +1,11 @@
 package com.app.adam.simplemusicplayer;
 
 import android.app.ListActivity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
@@ -38,6 +42,8 @@ public class PlaylistActivity extends ListActivity {
         SongFinder sf = new SongFinder();
 
         makeSongList(songsListData,sf,pos);
+
+        makeNotification(pos,1);
 
         songsButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -171,5 +177,45 @@ public class PlaylistActivity extends ListActivity {
                 finish();
             }
         });
+    }
+    public void makeNotification(int songIndex,int type){
+        if(type==1){
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationCompat.Builder nBuilder  = new NotificationCompat.Builder(getBaseContext())
+                    .setCategory(Notification.CATEGORY_EVENT)
+                    .setContentTitle("CMP Playing")
+                    .setContentText(songsList.get(songIndex).get("songArtist") + ": " + songsList.get(songIndex).get("songTitle"))
+                    .setSmallIcon(R.mipmap.ic_stat_mustache)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setAutoCancel(false);
+
+            Intent notificationIntent = new Intent(this, PlaylistActivity.class);
+            notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            PendingIntent intent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+            nBuilder.setContentIntent(intent);
+            notificationManager.notify(10, nBuilder.build());
+        }
+        if(type==2){
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationCompat.Builder nBuilder  = new NotificationCompat.Builder(getBaseContext())
+                    .setCategory(Notification.CATEGORY_EVENT)
+                    .setContentTitle("CMP Not Playing")
+                    .setContentText("Please press notification to restart playing")
+                    .setSmallIcon(R.mipmap.ic_stat_mustache)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setAutoCancel(false);
+
+            Intent resultIntent = new Intent(this, PlaylistActivity.class);
+            resultIntent.setAction(Intent.ACTION_MAIN);
+            resultIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                    resultIntent, 0);
+
+            nBuilder.setContentIntent(pendingIntent);
+            notificationManager.notify(10, nBuilder.build());
+        }
+
     }
 }

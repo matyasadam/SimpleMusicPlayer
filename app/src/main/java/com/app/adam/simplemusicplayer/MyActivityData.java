@@ -9,7 +9,7 @@ import java.util.ArrayList;
  */
 public class MyActivityData {
 
-    private  int LIMIT = 50 ;
+    private  int LIMIT = 18 ;
     private ArrayList<Integer> on_bicycle = new ArrayList<>();
     private ArrayList<Integer> in_vechicle = new ArrayList<>();
     private ArrayList<Integer> on_foot = new ArrayList<>();
@@ -106,5 +106,34 @@ public class MyActivityData {
     }
     public void setLIMIT(int LIMIT) {
         this.LIMIT = LIMIT;
+    }
+    public MySortData getMostRelevant(){
+
+        float tmpInVechicle=getInVechiclePercent();
+        float tmpOnFoot=getOnFootPercent();
+        float tmpStill=getStillPercent();
+        float tmponBike=getOnBicyclePercent();
+
+        ArrayList<MySortData> tmpSortData=new ArrayList<>();
+        tmpSortData.add(new MySortData("vechicle",tmpInVechicle));
+        tmpSortData.add(new MySortData("foot",tmpOnFoot));
+        tmpSortData.add(new MySortData("still",tmpStill));
+        tmpSortData.add(new MySortData("bike",tmponBike));
+
+        for(int i=0;i<tmpSortData.size();i++){
+            for(int j=0;j<tmpSortData.size();j++){
+                if(tmpSortData.get(i).getVal()>tmpSortData.get(j).getVal()){
+                    MySortData asd = new MySortData(tmpSortData.get(i).getAct(),tmpSortData.get(i).getVal());
+                    tmpSortData.get(i).setAct(tmpSortData.get(j).getAct());
+                    tmpSortData.get(i).setVal(tmpSortData.get(j).getVal());
+                    tmpSortData.get(j).setAct(asd.getAct());
+                    tmpSortData.get(j).setVal(asd.getVal());
+
+                }
+            }
+        }
+
+
+        return tmpSortData.get(0);
     }
 }
